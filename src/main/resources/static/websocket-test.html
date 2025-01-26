@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+<h2>WebSocket STOMP Test</h2>
+
+<label for="token">JWT Token:</label>
+<input type="text" id="token" placeholder="Enter your JWT token here"><br><br>
+
+<button onclick="connect()">Connect to WebSocket</button>
+<button onclick="disconnect()">Disconnect</button><br><br>
+
+<label for="message">Message:</label>
+<input type="text" id="message" placeholder="Enter your message">
+<button onclick="sendMessage()">Send Message</button><br><br>
+
+<h3>Received Messages:</h3>
+<div id="messages"></div>
+
+<script>
+    var stompClient = null;
+
+    function connect() {
+        var token = document.getElementById("token").value;
+        if (!token) {
+            alert("Please enter a JWT token!");
+            return;
+        }
+
+        var socket = new SockJS("http://localhost:8080/ws");
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({ Authorization: "Bearer " + token }, function (frame) {
+            console.log("Connected: " + frame);
+            document.getElementById("messages").innerHTML += "<p>✅ Connected to WebSocket</p>";
+
+            // Subscribe to topic messages
+            stompClient.subscribe("/topic/tasks", function (message) {
+                console.log("Received message: " + message.body);
+                document.getElementById("messages").innerHTML += "<p>📩 " + message.body + "</p>";
+            });
+
+            // Subscribe to user-specific messages
+            stompClient.subscribe("/user/queue/reply", function (message) {
+                console.log("Received user-specific message: " + message.body);
+                document.getElementById("messages").innerHTML += "<p>📩 [User] " + message.body + "</p>";
+            });
+        }, function (error) {
+            console.error("WebSocket Error: ", error);
+            document.getElementById("messages").innerHTML += "<p>❌ Connection failed!</p>";
+        });
+    }
+
+    function disconnect() {
+        if (stompClient !== null) {
+            stompClient.disconnect();
+            console.log("Disconnected");
+            document.getElementById("messages").innerHTML += "<p>❌ Disconnected</p>";
+        }
+    }
+
+    function sendMessage() {
+        var messageContent = document.getElementById("message").value;
+        if (stompClient && stompClient.connected && messageContent) {
+            stompClient.send("/app/task-updates", {}, JSON.stringify({ message: messageContent }));
+            console.log("Sent message: " + messageContent);
+            document.getElementById("messages").innerHTML += "<p>📤 Sent: " + messageContent + "</p>";
+        } else {
+            alert("Cannot send message. Check connection and message content.");
+        }
+    }
+</script>
+</body>
+</html>
