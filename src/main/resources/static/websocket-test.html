@@ -3,78 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebSocket Test</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <title>WebSocket Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
 </head>
 <body>
-<h2>WebSocket STOMP Test</h2>
 
-<label for="token">JWT Token:</label>
-<input type="text" id="token" placeholder="Enter your JWT token here"><br><br>
+<h2>WebSocket Chat</h2>
 
-<button onclick="connect()">Connect to WebSocket</button>
-<button onclick="disconnect()">Disconnect</button><br><br>
+<div>
+    <input type="text" id="message" placeholder="Type a message..." />
+    <button onclick="sendMessage()">Send</button>
+</div>
 
-<label for="message">Message:</label>
-<input type="text" id="message" placeholder="Enter your message">
-<button onclick="sendMessage()">Send Message</button><br><br>
-
-<h3>Received Messages:</h3>
-<div id="messages"></div>
+<h3>Messages:</h3>
+<ul id="messages"></ul>
 
 <script>
-    var stompClient = null;
+    // WebSocket bağlantısını oluştur
+    let socket = new SockJS('http://localhost:8080/ws');
+    let stompClient = Stomp.over(socket);
 
-    function connect() {
-        var token = document.getElementById("token").value;
-        if (!token) {
-            alert("Please enter a JWT token!");
-            return;
-        }
+    stompClient.connect({}, function (frame) {
+        console.log("Connected to WebSocket: " + frame);
 
-        var socket = new SockJS("http://localhost:8080/ws");
-        stompClient = Stomp.over(socket);
-
-        stompClient.connect({ Authorization: "Bearer " + token }, function (frame) {
-            console.log("Connected: " + frame);
-            document.getElementById("messages").innerHTML += "<p>✅ Connected to WebSocket</p>";
-
-            // Subscribe to topic messages
-            stompClient.subscribe("/topic/tasks", function (message) {
-                console.log("Received message: " + message.body);
-                document.getElementById("messages").innerHTML += "<p>📩 " + message.body + "</p>";
-            });
-
-            // Subscribe to user-specific messages
-            stompClient.subscribe("/user/queue/reply", function (message) {
-                console.log("Received user-specific message: " + message.body);
-                document.getElementById("messages").innerHTML += "<p>📩 [User] " + message.body + "</p>";
-            });
-        }, function (error) {
-            console.error("WebSocket Error: ", error);
-            document.getElementById("messages").innerHTML += "<p>❌ Connection failed!</p>";
+        // 📌 `/topic/public` kanalına abone ol
+        stompClient.subscribe('/topic/public', function (message) {
+            showMessage(message.body);
         });
-    }
+    });
 
-    function disconnect() {
-        if (stompClient !== null) {
-            stompClient.disconnect();
-            console.log("Disconnected");
-            document.getElementById("messages").innerHTML += "<p>❌ Disconnected</p>";
-        }
-    }
-
+    // 📌 Mesajı sunucuya gönder
     function sendMessage() {
-        var messageContent = document.getElementById("message").value;
-        if (stompClient && stompClient.connected && messageContent) {
-            stompClient.send("/app/task-updates", {}, JSON.stringify({ message: messageContent }));
-            console.log("Sent message: " + messageContent);
-            document.getElementById("messages").innerHTML += "<p>📤 Sent: " + messageContent + "</p>";
-        } else {
-            alert("Cannot send message. Check connection and message content.");
+        let messageContent = document.getElementById("message").value;
+        if (messageContent) {
+            stompClient.send("/app/sendMessage", {}, messageContent);
+            document.getElementById("message").value = ""; // Mesaj kutusunu temizle
         }
+    }
+
+    // 📌 Mesajları ekrana yazdır
+    function showMessage(message) {
+        let messagesList = document.getElementById("messages");
+        let messageElement = document.createElement("li");
+        messageElement.appendChild(document.createTextNode(message));
+        messagesList.appendChild(messageElement);
     }
 </script>
+
 </body>
 </html>
